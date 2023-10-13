@@ -20,7 +20,11 @@ const client = new MongoClient(uri, {
 });
 
 const userCollection = client.db("SocialMedia").collection("userCollection");
-const postCollection = client.db("SocialMedia").collection("userCollection");
+const postCollection = client.db("SocialMedia").collection("postCollection");
+const likeCollection = client.db("SocialMedia").collection("likeCollection");
+const commentCollection = client
+  .db("SocialMedia")
+  .collection("commentCollection");
 
 const verifyJwt = (req, res, next) => {
   const authorization = req.headers.authorization;
@@ -72,18 +76,47 @@ async function run() {
     app.get("/users:email", async (req, res) => {
       res.send("ok");
     });
+    app.get("/posts", async (req, res) => {
+      const posts = await postCollection
+        .find({})
+        .sort({ uploadTimestamp: -1 })
+        .toArray();
+
+      res.send(posts);
+    });
     app.post("/users", async (req, res) => {
       const user = req.body;
-      console.log(user);
-      user.time = Date.now();
-      const result = await userCollection.insertOne(user);
-      console.log(result);
-      res.send(result);
+      const find = await userCollection.findOne({ userId: user?.userId });
+      console.log("🚀 ~ file: index.js:78 ~ app.post ~ find:", find);
+
+      if (find) {
+        res.send([1]);
+      } else {
+        user.time = Date.now();
+        const result = await userCollection.insertOne(user);
+        console.log(result);
+        res.send(result);
+      }
+    });
+
+    //   update use
+    app.put("/users/:id", async (req, res) => {
+      const body = req.body;
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: body.role,
+        },
+      };
+      const result = await usersCollection.updateOne(query, updateDoc, {
+        upsert: true,
+      });
+      res.status(200).send(result);
     });
 
     app.post("/post", verifyJwt, async (req, res) => {
       const post = req.body;
-
       const userId = req.query.uid;
       const decodedUid = req.decoded.uid;
       console.log({ decodedEmail: decodedUid });
@@ -92,7 +125,47 @@ async function run() {
           .status(403)
           .send({ error: true, message: "forbidden access" });
       }
+      post.createdAt = Date.now();
+      post.reaction = false;
+      post.totalLike = 0;
+
       const result = await postCollection.insertOne(post);
+      res.send(result);
+    });
+    app.put("/posts/:postId/reaction", async (req, res) => {
+      const postId = req.params.postId;
+      console.log("🚀 ~ file: index.js:131 ~ app.put ~ postId:", postId);
+      const { reaction, totalLike, userId } = req.body;
+      if (reaction) {
+        const added = await likeCollection.insertOne({
+          userId,
+          postId,
+          reaction,
+        });
+        console.log("🚀 ~ file: index.js:145 ~ app.put ~ added:", added);
+      } else {
+        const deleted = await likeCollection.deleteOne({ postId, userId });
+        console.log("🚀 ~ file: index.js:147 ~ app.put ~ deleted:", deleted);
+      }
+
+      const filter = { _id: new ObjectId(postId) };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          totalLike: totalLike,
+        },
+      };
+      const result = await postCollection.updateOne(filter, updateDoc, options);
+      if (result.acknowledged) {
+        res.send(result).status(200);
+      } else {
+        res.status(403).send({ error: true, message: "forbidden access" });
+      }
+    });
+    // reaction by user id
+    app.get("/reactions", async (req, res) => {
+      const userId = req.query.userId;
+      const result = await likeCollection.find({ userId }).toArray();
       res.send(result);
     });
   } finally {
