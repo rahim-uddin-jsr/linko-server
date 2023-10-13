@@ -77,11 +77,13 @@ async function run() {
       res.send("ok");
     });
     app.get("/posts", async (req, res) => {
-      const posts = await postCollection
-        .find({})
-        .sort({ uploadTimestamp: -1 })
-        .toArray();
-
+      const id = req.query.id;
+      if (id) {
+        const post = await postCollection.findOne({ _id: new ObjectId(id) });
+        res.send(post).status("success", 200);
+        return;
+      }
+      const posts = await postCollection.find({}).toArray();
       res.send(posts);
     });
     app.post("/users", async (req, res) => {
@@ -166,6 +168,20 @@ async function run() {
     app.get("/reactions", async (req, res) => {
       const userId = req.query.userId;
       const result = await likeCollection.find({ userId }).toArray();
+      res.send(result);
+    });
+    app.post("/comments", async (req, res) => {
+      const { userId, postId, comment } = req.body;
+      const result = await commentCollection.insertOne({
+        userId,
+        postId,
+        comment,
+      });
+      res.send(result);
+    });
+    app.get("/comments", async (req, res) => {
+      const { postId } = req.query;
+      const result = await commentCollection.find({ postId }).toArray();
       res.send(result);
     });
   } finally {
