@@ -28,27 +28,20 @@ const commentCollection = client
 
 const verifyJwt = (req, res, next) => {
   const authorization = req.headers.authorization;
-  console.log(
-    "🚀 ~ file: index.js:27 ~ verifyJwt ~ authorization:",
-    authorization
-  );
+
   if (!authorization) {
     return res
       .status(401)
       .send({ error: true, message: "unauthorized access" });
   }
   const token = authorization.split(",")[1];
-  if (!token) {
-    console.log("token not found");
-  }
+
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
     if (err) {
-      console.log(err);
       return res
         .status(401)
         .send({ error: true, message: "unauthorized access" });
     }
-    console.log({ decoded });
     req.decoded = decoded;
     next();
   });
@@ -89,14 +82,11 @@ async function run() {
     app.post("/users", async (req, res) => {
       const user = req.body;
       const find = await userCollection.findOne({ userId: user?.userId });
-      console.log("🚀 ~ file: index.js:78 ~ app.post ~ find:", find);
-
       if (find) {
         res.send(find);
       } else {
         user.time = Date.now();
         const result = await userCollection.insertOne(user);
-        console.log(result);
         res.send(result);
       }
     });
@@ -125,7 +115,6 @@ async function run() {
       const post = req.body;
       const userId = req.query.uid;
       const decodedUid = req.decoded.uid;
-      console.log({ decodedEmail: decodedUid });
       if (userId !== decodedUid) {
         return res
           .status(403)
@@ -138,9 +127,9 @@ async function run() {
       const result = await postCollection.insertOne(post);
       res.send(result);
     });
+
     app.put("/posts/:postId/reaction", async (req, res) => {
       const postId = req.params.postId;
-      console.log("🚀 ~ file: index.js:131 ~ app.put ~ postId:", postId);
       const { reaction, totalLike, userId } = req.body;
       if (reaction) {
         const added = await likeCollection.insertOne({
@@ -148,10 +137,8 @@ async function run() {
           postId,
           reaction,
         });
-        console.log("🚀 ~ file: index.js:145 ~ app.put ~ added:", added);
       } else {
         const deleted = await likeCollection.deleteOne({ postId, userId });
-        console.log("🚀 ~ file: index.js:147 ~ app.put ~ deleted:", deleted);
       }
 
       const filter = { _id: new ObjectId(postId) };
@@ -161,6 +148,7 @@ async function run() {
           totalLike: totalLike,
         },
       };
+
       const result = await postCollection.updateOne(filter, updateDoc, options);
       if (result.acknowledged) {
         res.send(result).status(200);
