@@ -92,7 +92,7 @@ async function run() {
       console.log("🚀 ~ file: index.js:78 ~ app.post ~ find:", find);
 
       if (find) {
-        res.send([1]);
+        res.send(find);
       } else {
         user.time = Date.now();
         const result = await userCollection.insertOne(user);
@@ -101,17 +101,21 @@ async function run() {
       }
     });
 
-    //   update use
-    app.put("/users/:id", async (req, res) => {
-      const body = req.body;
+    //   update user
+    app.put("/users/:id", verifyJwt, async (req, res) => {
+      const { name, email, university, address, profileImg } = req.body;
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
-          role: body.role,
+          name,
+          email,
+          university,
+          address,
+          profileImg,
         },
       };
-      const result = await usersCollection.updateOne(query, updateDoc, {
+      const result = await userCollection.updateOne(query, updateDoc, {
         upsert: true,
       });
       res.status(200).send(result);
